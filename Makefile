@@ -1,4 +1,3 @@
-setup: install lock
 install:
 	poetry install
 dev:
