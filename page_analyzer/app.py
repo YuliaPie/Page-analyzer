@@ -8,7 +8,6 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
 @app.route('/')
 def try_template():
-
     return render_template(
         'index.html'
     )
