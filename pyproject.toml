@@ -16,6 +16,7 @@ python-dotenv = "^1.0.1"
 flake8 = "^7.0.0"
 pip = "^24.0"
 poetry = "1.8.3"
+psycopg2-binary = "^2.9.9"
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^7.0.0"

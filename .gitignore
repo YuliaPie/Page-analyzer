@@ -3,6 +3,5 @@ __pycache__
 dist/
 .DS_Store
 .idea/
-.coverage
-coverage.xml
 setup.cfg:Zone.Identifier
+.env
