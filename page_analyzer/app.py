@@ -2,40 +2,66 @@ from flask import Flask, render_template, request, flash, url_for, redirect
 from dotenv import load_dotenv
 import os
 import psycopg2
-from validators import url
 import datetime
+import validators
 
+
+# загрузкa файлa .env
+# в нем: "export DATABASE_URL=postgresql://postgres:ПАРОЛЬ@localhost:5432/postgres"
+# SECRET_KEY=<КЛЮЧ>
+# этот файл у нас добавлен в .gitignore
+# также у нас должна быть создана БД через оболочку psql
+# команда та же, что прописана в database.sql
 load_dotenv()
+# назначаем БД через обращение к переменной среды DATABASE_URL
 DATABASE_URL = os.getenv('DATABASE_URL')
+# подключаемся к базе данных
 conn = psycopg2.connect(DATABASE_URL)
+# создаем объект класса Flask, передав аргументом имя модуля
 app = Flask(__name__)
+# извлекаем ключ из переменных окружения
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-# получение объекта курсора
 
 
-# Обработчик главной страницы
+# Обработчик главной страницы. Просто рендерим форму
 @app.route('/')
 def show_main_page():
     return render_template(
         'index.html'
     )
 # Обработчик списка сайтов (отображение)
+
+
 @app.get('/urls')
 def urls_get():
-    with conn.cursor as curs:
+    # связываеемся с БД  через контекстный менеджер
+    with conn.cursor() as curs:
+        # передаем  SQL-запрос
+        # чтобы выбрать всё из таблицы urls
         curs.execute('SELECT * FROM urls')
+        # сохраняем результат в переменную
+        # Для получения результата после выполнения запроса
+        # используем команду
+        # cursor.fetchall() — вернуть все строки
         all_urls = curs.fetchall()
+        # рендерим шаблон списка сайтов, передав в него
+        # результат запроса через переменную
     return render_template(
         'urls.html', all_urls=all_urls
     )
 # Обработчик добавления сайта в бд
+
+
 @app.post('/urls')
 def post_url():
     # Извлекаем данные формы
-    data = request.form['url']
+    data_url = request.form['url']
     # Проверяем корректность данных
-    if not url(data):
-        # Если возникли ошибки, то устанавливаем код ответа в 422
+    # с помощью функции url из пакета validators
+    # она проверяет, является ли значение
+    # допустимым URL - адресом
+    if not validators.url(data_url):
+        # это не допустимый адрес, то устанавливаем код ответа в 422
         # и рендерим главную страницу
         # со флеш-сообщением об ошибке
         flash('Некорректный URL', "error")
@@ -44,18 +70,37 @@ def post_url():
     # Если данные корректны, то добавляем данные в базу
     # получаем текущую дату
     current_date = datetime.date.today().isoformat()
+    # через курсор и контекстный менеджер
     with conn.cursor() as curs:
-        curs.execute("INSERT INTO urls (name, created_at) VALUES (%s, %s), "
-                     "(data, current_date)")
+        # добавляем в БД новый url с инфой из формы и текущей датой
+        # id у нас генерируется сам
+        curs.execute(f"INSERT INTO urls (name, created_at) VALUES ('{data_url}',"
+                     f" '{current_date}')")
+# добавляем флеш-сообщение об успеха
     flash('Страница успешно добавлена', 'success')
-    return redirect(url_for('show_url'))
-#вывод конкретного введенного URL на отдельной странице
-@app.route('/urls/<int:id>')
-def get_url(id):
-    with conn.cursor as curs:
-        curs.execute('SELECT * FROM urls WHERE id=%s", (id,)')
-        url = curs.fetchall()
-    if url is None:
-        return 'Page not found', 404
+    # делаем редирект на страницу нового url
+    # для этого нам нужно знать его id
+    # с помощью курсора и контекстного менеджера
+    # ищем в бд id того url имя которого совпадает с текущим
+    # сохраняем результат в переменную
+    # делаем редирект на страницу с id - этой переменной
+    with conn.cursor() as curs:
+        curs.execute('SELECT id FROM urls WHERE name=%s;', (data_url,))
+        new_id = curs.fetchone()
+    return redirect(url_for('urls_get', id=new_id))
 
-    return render_template('show_url.html', url=url)
+
+# вывод конкретного введенного URL на отдельной странице
+# обработчик маршрута принимает параметр url_id
+# Функция get_url(url_id) принимает значение url_id из URL-адреса
+
+
+@app.route('/urls/<url_id>')
+def get_url(url_id):
+    # связываеемся с БД  через контекстный менеджер
+    with conn.cursor() as curs:
+        curs.execute(f'SELECT * FROM urls WHERE id={url_id}')
+        this_url = curs.fetchall()
+    if this_url is None:
+        return 'Page not found', 404
+    return render_template('show_url.html', url=this_url)
