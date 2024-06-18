@@ -40,13 +40,13 @@
     </thead>
     <tbody>
 <! -- пошла таблица из цикла -->
-     {% for urls in all_urls %}
+     <! -- {% for url in all_urls %}
      <tr>
        <td>
            {{ url.id }}
        </td>
        <td>
-        <a href="/urls/{{ url.id }}">
+        <a href="/urls/{{ url_id }}">
             {{ url.name }}
         </a>
        </td>
