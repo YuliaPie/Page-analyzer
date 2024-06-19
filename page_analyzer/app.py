@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, flash, url_for, redirect, get_flashed_messages
+from flask import (Flask, render_template, request,
+                   flash, url_for, redirect, get_flashed_messages)
 from dotenv import load_dotenv
 import os
 import psycopg2
@@ -8,7 +9,8 @@ from psycopg2.extras import NamedTupleCursor
 from urllib.parse import urlparse
 
 # загрузкa файлa .env
-# в нем: "export DATABASE_URL=postgresql://postgres:ПАРОЛЬ@localhost:5432/postgres"
+# в нем: "export DATABASE_URL=postgresql://
+# postgres:ПАРОЛЬ@localhost:5432/postgres"
 # SECRET_KEY=<КЛЮЧ>
 # этот файл у нас добавлен в .gitignore
 # БД создана через оболочку psql, команда та же, что прописана в database.sql
@@ -43,7 +45,7 @@ def urls_get():
     # ловим флеш-сообщения
     messages = get_flashed_messages(with_categories=True)
     # рендерим шаблон списка сайтов, передав в него результат запроса
-    return render_template('urls.html', all_urls=all_urls,messages=messages,)
+    return render_template('urls.html', all_urls=all_urls, messages=messages,)
 
 
 # Обработчик добавления сайта в бд
@@ -56,15 +58,15 @@ def add_url():
     # Проверяем корректность URL
     error_msg = validate_url(norm_url)
     if error_msg:
-        # Если есть ошибка валидации, показываем сообщение об ошибке и возвращаем исходный URL обратно в форму
+        # Если есть ошибка валидации, показываем сообщение
+        # об ошибке и возвращаем исходный URL обратно в форму
         flash(error_msg, 'danger')
         # ловим флеш-сообщения
         messages = get_flashed_messages(with_categories=True)
         return render_template(
             'index.html',
-            url=get_url, messages=messages), 422  # Возвращаем исходный URL обратно в форму
-
-
+            # Возвращаем исходный URL обратно в форму
+            url=get_url, messages=messages), 422
 
     # Проверяем, существует ли URL в базе данных
     # подключаемся к базе данных
@@ -94,9 +96,9 @@ def add_url():
     conn.commit()
     conn.close()
 
-
     # теперь выбираем из таблицы данные на новую запись
-    # используем NamedTupleCursor, чтобы вернуть данные в виде именованного кортежа:
+    # используем NamedTupleCursor,
+    # чтобы вернуть данные в виде именованного кортежа:
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
         curs.execute(f'SELECT * FROM urls WHERE id={new_id}')
@@ -117,7 +119,7 @@ def validate_url(input_url):
         return 'Введенный URL превышает длину в 255 символов'
 
 
- # эти данные нормализуем
+# эти данные нормализуем
 def normalise_url(input_url):
     # делим на протокол и хост
     parsed_url = urlparse(input_url)
@@ -127,7 +129,8 @@ def normalise_url(input_url):
 
 @app.route('/urls/<url_id>')
 def show_url(url_id):
-    # используем NamedTupleCursor, чтобы вернуть данные в виде именованного кортежа:
+    # используем NamedTupleCursor, чтобы вернуть
+    # данные в виде именованного кортежа:
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
         curs.execute(f'SELECT * FROM urls WHERE id={url_id}')
