@@ -20,7 +20,11 @@
 </nav>
 
   </header>
-
+  {% if messages %}
+  {% for category, message in messages %}
+    <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+  {% endfor %}
+{% endif %}
 
 
   <main class="flex-grow-1">
@@ -40,7 +44,7 @@
     </thead>
     <tbody>
 <! -- пошла таблица из цикла -->
-     <! -- {% for url in all_urls %}
+     {% for url in all_urls %}
      <tr>
        <td>
            {{ url.id }}
