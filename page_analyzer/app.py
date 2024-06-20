@@ -137,7 +137,7 @@ def show_url(url_id):
         url = curs.fetchone()
     conn.close()
     messages = get_flashed_messages(with_categories=True)
-    return render_template('show_url.html', url=url,  messages=messages,)
+    return render_template('show_url.html', url=url, messages=messages,)
 
 
 # создание новой проверки
