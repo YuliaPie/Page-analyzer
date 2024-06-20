@@ -137,4 +137,37 @@ def show_url(url_id):
         url = curs.fetchone()
     conn.close()
     messages = get_flashed_messages(with_categories=True)
-    return render_template('show_url.html', url=url, messages=messages,)
+    return render_template('show_url.html', url=url,  messages=messages,)
+
+
+# создание новой проверки
+@app.post('/urls/<url_id>/checks')
+def make_check(url_id):
+    conn = psycopg2.connect(DATABASE_URL)
+    with conn.cursor() as curs:
+        curs.execute(
+            "INSERT INTO url_checks (url_id, created_at)\
+            VALUES (%s, %s)\
+            RETURNING id;",
+            (url_id, date.today().isoformat()),
+        )
+    conn.commit()
+    conn.close()
+    conn = psycopg2.connect(DATABASE_URL)
+    # связываеемся с БД  через контекстный менеджер с cursor_factory
+    with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
+        # передаем  SQL-запрос
+        # чтобы выбрать всё из таблицы urls
+        curs.execute('SELECT * FROM url_checks WHERE url_id=%s', (url_id,))
+        # сохраняем результат в переменную
+        url_check = curs.fetchone()
+    conn.close()  # закрываем соединение
+    conn = psycopg2.connect(DATABASE_URL)
+    with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
+        curs.execute(f'SELECT * FROM urls WHERE id={url_id}')
+        url = curs.fetchone()
+    conn.close()
+    # рендерим шаблон отдельного url,
+    # но уже с заполненной таблицей проверок
+    print(url_check)
+    return render_template('show_url.html', url=url, url_check=url_check, )

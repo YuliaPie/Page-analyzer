@@ -4,3 +4,13 @@ CREATE TABLE IF NOT EXISTS urls
   name VARCHAR(50) NOT NULL,
   created_at DATE NOT NULL
 );
+CREATE TABLE IF NOT EXISTS url_checks
+(
+  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  url_id BIGINT NOT NULL,
+  status_code INT,
+  h1 TEXT,
+  title TEXT,
+  description TEXT,
+  created_at DATE NOT NULL
+);
