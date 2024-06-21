@@ -7,6 +7,8 @@ from datetime import date
 import validators
 from psycopg2.extras import NamedTupleCursor
 from urllib.parse import urlparse
+import requests
+from requests import RequestException
 
 # загрузкa файлa .env
 # в нем: "export DATABASE_URL=postgresql://
@@ -37,8 +39,15 @@ def urls_get():
     # связываеемся с БД  через контекстный менеджер с cursor_factory
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
         # передаем  SQL-запрос
-        # чтобы выбрать всё из таблицы urls
-        curs.execute('SELECT * FROM urls ORDER BY id DESC')
+        # чтобы выбрать всё из таблиц urls + url_checks
+        curs.execute('SELECT urls.url_id, '
+                     'urls.name, url_checks.status_code, '
+                     'url_checks.created_at '
+                     'FROM '
+                     'urls JOIN url_checks '
+                     'ON urls.url_id = url_checks.url_id '
+                     'ORDER BY urls.url_id DESC')
+
         # сохраняем результат в переменную
         all_urls = curs.fetchall()
     conn.close()  # закрываем соединение
@@ -72,13 +81,13 @@ def add_url():
     # подключаемся к базе данных
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor() as curs:
-        curs.execute('SELECT id FROM urls WHERE name=%s', (norm_url,))
+        curs.execute('SELECT url_id FROM urls WHERE name=%s', (norm_url,))
         url = curs.fetchone()
     conn.close()  # закрываем соединение
     if url:
-        id = url[0]
+        url_id = url[0]
         flash('Страница уже существует', 'warning')
-        return redirect(url_for('urls_get', id=id))
+        return redirect(url_for('urls_get', id=url_id))
 
     # Если URL не существует, добавляем его в базу данных
     conn = psycopg2.connect(DATABASE_URL)
@@ -89,7 +98,7 @@ def add_url():
         curs.execute(
             "INSERT INTO urls (name, created_at)\
             VALUES (%s, %s)\
-            RETURNING id;",
+            RETURNING url_id;",
             (norm_url, current_date),
         )
         new_id = curs.fetchone()[0]
@@ -101,7 +110,7 @@ def add_url():
     # чтобы вернуть данные в виде именованного кортежа:
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        curs.execute(f'SELECT * FROM urls WHERE id={new_id}')
+        curs.execute(f'SELECT * FROM urls WHERE url_id={new_id}')
         url = curs.fetchone()
     conn.close()
     # добавляем флеш-сообщение об успехе
@@ -133,7 +142,7 @@ def show_url(url_id):
     # данные в виде именованного кортежа:
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        curs.execute(f'SELECT * FROM urls WHERE id={url_id}')
+        curs.execute(f'SELECT * FROM urls WHERE url_id={url_id}')
         url = curs.fetchone()
     conn.close()
     messages = get_flashed_messages(with_categories=True)
@@ -143,31 +152,39 @@ def show_url(url_id):
 # создание новой проверки
 @app.post('/urls/<url_id>/checks')
 def make_check(url_id):
-    conn = psycopg2.connect(DATABASE_URL)
-    with conn.cursor() as curs:
-        curs.execute(
-            "INSERT INTO url_checks (url_id, created_at)\
-            VALUES (%s, %s)\
-            RETURNING id;",
-            (url_id, date.today().isoformat()),
-        )
-    conn.commit()
-    conn.close()
-    conn = psycopg2.connect(DATABASE_URL)
-    # связываеемся с БД  через контекстный менеджер с cursor_factory
-    with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        # передаем  SQL-запрос
-        # чтобы выбрать всё из таблицы urls
-        curs.execute('SELECT * FROM url_checks WHERE url_id=%s', (url_id,))
-        # сохраняем результат в переменную
-        url_check = curs.fetchone()
-    conn.close()  # закрываем соединение
+    # получаем снова всю инфу про наш урл
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        curs.execute(f'SELECT * FROM urls WHERE id={url_id}')
+        curs.execute(f'SELECT * FROM urls WHERE url_id={url_id}')
         url = curs.fetchone()
     conn.close()
-    # рендерим шаблон отдельного url,
-    # но уже с заполненной таблицей проверок
-    print(url_check)
-    return render_template('show_url.html', url=url, url_check=url_check, )
+    try:
+        # пробуем сделать запрос на сайт
+        url_response = requests.get(url.name)
+        # при ответе больше 400 вызовем ошибку
+        url_response.raise_for_status()
+        # добавим запись о проверке в бд
+        conn = psycopg2.connect(DATABASE_URL)
+        with conn.cursor() as curs:
+            curs.execute(
+                "INSERT INTO url_checks (url_id, status_code, created_at)\
+                VALUES (%s, %s, %s)\
+                RETURNING check_id;",
+                (url_id, url_response.status_code, date.today().isoformat()),
+            )
+        conn.commit()
+        conn.close()
+        conn = psycopg2.connect(DATABASE_URL)
+        # забираем новую запись о проверке с бд
+        with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
+            curs.execute('SELECT * FROM url_checks WHERE url_id=%s', (url_id,))
+            url_check = curs.fetchone()
+        conn.close()
+        # рендерим шаблон отдельного url,
+        # но уже с заполненной таблицей проверок
+        print(url_check)
+        return render_template('show_url.html', url=url, url_check=url_check, )
+    except RequestException as e:
+        print(e)
+        flash('Произошла ошибка при проверке', 'danger')
+        return redirect(url_for('show_url', url_id=url_id, url=url))

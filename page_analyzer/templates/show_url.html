@@ -41,10 +41,10 @@
       <tbody>
      <tr>
        <td>
-           {{ url.id }}
+           {{ url.url_id }}
        </td>
        <td>
-        <a href="/urls/{{ url.id }}">
+        <a href="/urls/{{ url.url_id }}">
             {{ url.name }}
         </a>
        </td>
@@ -57,7 +57,7 @@
   </div>
 
     <h2 class="mt-5 mb-3">Проверки</h2>
-    <form method="post" action="/urls/{{ url.id }}/checks">
+    <form method="post" action="/urls/{{ url.url_id }}/checks">
     <input type="submit" class="btn btn-primary" value="Запустить проверку">
     </form>
 
@@ -77,8 +77,8 @@
       <tbody>
       {% if url_check %}
     <tr>
-        <td> {{ url_check.id }} </td>
-        <td></td>
+        <td> {{ url_check.check_id }} </td>
+        <td>{{ url_check.status_code }}</td>
         <td></td>
         <td></td>
         <td></td>

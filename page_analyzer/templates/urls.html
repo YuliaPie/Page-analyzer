@@ -43,24 +43,24 @@
     </tr>
     </thead>
     <tbody>
-<! -- пошла таблица из цикла -->
      {% for url in all_urls %}
      <tr>
        <td>
-           {{ url.id }}
+           {{ url.url_id }}
        </td>
        <td>
-        <a href="/urls/{{ url_id }}">
+        <a href="/urls/{{ url.id }}">
             {{ url.name }}
         </a>
        </td>
        <td>
            {{ url.created_at }}
        </td>
-<! -- тут еще надо придумать, как передать коды ответов  -->
+       <td>
+           {{ url.status_code }}
+       </td>
      </tr>
      {% endfor %}
-<! -- конец цикла -->
     </tbody>
   </table>
 </div>
