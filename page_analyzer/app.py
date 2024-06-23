@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 from flask import (Flask, render_template, request,
                    flash, url_for, redirect, get_flashed_messages)
 from dotenv import load_dotenv
@@ -42,7 +43,7 @@ def urls_get():
         # чтобы выбрать всё из таблиц urls + url_checks
         curs.execute('SELECT urls.url_id, '
                      'urls.name, url_checks.status_code, '
-                     'url_checks.created_at '
+                     'url_checks.created_at, '
                      'FROM '
                      'urls JOIN url_checks '
                      'ON urls.url_id = url_checks.url_id '
@@ -165,12 +166,26 @@ def make_check(url_id):
         url_response.raise_for_status()
         # добавим запись о проверке в бд
         conn = psycopg2.connect(DATABASE_URL)
+        soup = BeautifulSoup(url_response.text, 'html.parser')
+        h1 = soup.h1.string if soup.h1 else ''
+        title = soup.find('title').string if soup.find('title') else ''
+        description = soup.find("meta",
+                                property="og:description").get("content")\
+            if soup.find("meta",
+                         property="og:description").get("content") else ""
+        print(f"h1{h1}")
+        print(f"title{title}")
+        print(f"description{description}")
         with conn.cursor() as curs:
             curs.execute(
-                "INSERT INTO url_checks (url_id, status_code, created_at)\
-                VALUES (%s, %s, %s)\
+                "INSERT INTO url_checks (url_id,"
+                "status_code, h1, "
+                "title, description,"
+                "created_at)\
+                VALUES (%s, %s, %s, %s, %s, %s)\
                 RETURNING check_id;",
-                (url_id, url_response.status_code, date.today().isoformat()),
+                (url_id, url_response.status_code, h1, title,
+                 description, date.today().isoformat()),
             )
         conn.commit()
         conn.close()
