@@ -41,14 +41,19 @@ def urls_get():
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
         # передаем  SQL-запрос
         # чтобы выбрать всё из таблиц urls + url_checks
-        curs.execute('SELECT urls.url_id, '
-                     'urls.name, url_checks.status_code, '
-                     'url_checks.created_at, '
-                     'FROM '
-                     'urls JOIN url_checks '
-                     'ON urls.url_id = url_checks.url_id '
-                     'ORDER BY urls.url_id DESC')
-
+        curs.execute("""SELECT urls.url_id, urls.name,
+        uc.status_code, uc.created_at
+        FROM urls
+        LEFT JOIN (
+            SELECT url_id, MAX(created_at)
+            AS max_created_at
+            FROM url_checks
+            GROUP BY url_id
+        ) AS max_dates ON urls.url_id = max_dates.url_id
+        LEFT JOIN url_checks uc
+        ON max_dates.url_id = uc.url_id
+        AND max_dates.max_created_at = uc.created_at
+        ORDER BY urls.url_id DESC;""")
         # сохраняем результат в переменную
         all_urls = curs.fetchall()
     conn.close()  # закрываем соединение
@@ -87,7 +92,7 @@ def add_url():
     conn.close()  # закрываем соединение
     if url:
         url_id = url[0]
-        flash('Страница уже существует', 'warning')
+        flash('Страница уже существует', 'info')
         return redirect(url_for('urls_get', id=url_id))
 
     # Если URL не существует, добавляем его в базу данных
@@ -115,7 +120,7 @@ def add_url():
         url = curs.fetchone()
     conn.close()
     # добавляем флеш-сообщение об успехе
-    flash('Страница успешно добавлена', 'success')
+    flash('Страница успешно добавлена', 'info')
     # делаем редирект на страницу нового url
     return redirect(url_for('show_url', url_id=new_id, url=url))
 
@@ -169,13 +174,9 @@ def make_check(url_id):
         soup = BeautifulSoup(url_response.text, 'html.parser')
         h1 = soup.h1.string if soup.h1 else ''
         title = soup.find('title').string if soup.find('title') else ''
-        description = soup.find("meta",
-                                property="og:description").get("content")\
-            if soup.find("meta",
-                         property="og:description").get("content") else ""
-        print(f"h1{h1}")
-        print(f"title{title}")
-        print(f"description{description}")
+        meta_description = soup.find("meta", property="og:description")
+        description = meta_description.get("content")\
+            if meta_description else ""
         with conn.cursor() as curs:
             curs.execute(
                 "INSERT INTO url_checks (url_id,"
@@ -192,14 +193,14 @@ def make_check(url_id):
         conn = psycopg2.connect(DATABASE_URL)
         # забираем новую запись о проверке с бд
         with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-            curs.execute('SELECT * FROM url_checks WHERE url_id=%s', (url_id,))
-            url_check = curs.fetchone()
+            curs.execute("SELECT * FROM url_checks \
+            WHERE url_id=%s ORDER BY check_id DESC", (url_id,))
+            url_checks = curs.fetchall()
         conn.close()
         # рендерим шаблон отдельного url,
         # но уже с заполненной таблицей проверок
-        print(url_check)
-        return render_template('show_url.html', url=url, url_check=url_check, )
-    except RequestException as e:
-        print(e)
+        return render_template('show_url.html',
+                               url=url, url_checks=url_checks, )
+    except RequestException:
         flash('Произошла ошибка при проверке', 'danger')
         return redirect(url_for('show_url', url_id=url_id, url=url))

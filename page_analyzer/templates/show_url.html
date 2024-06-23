@@ -75,15 +75,17 @@
       </tr>
     </thead>
       <tbody>
-      {% if url_check %}
+      {% if url_checks %}
+      {% for check in url_checks %}
     <tr>
-        <td> {{ url_check.check_id }} </td>
-        <td>{{ url_check.status_code }}</td>
-        <td>{{ url_check.h1 }}</td>
-        <td>{{ url_check.title }}</td>
-        <td>{{ url_check.description }}</td>
-        <td>{{ url_check.created_at }}</td>
+        <td> {{ check.check_id }} </td>
+        <td>{{ check.status_code }}</td>
+        <td>{{ check.h1 }}</td>
+        <td>{{ check.title }}</td>
+        <td>{{ check.description }}</td>
+        <td>{{ check.created_at }}</td>
     </tr>
+      {% endfor %}
     {% endif %}
 
     </tbody>
