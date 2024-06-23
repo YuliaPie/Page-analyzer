@@ -41,18 +41,16 @@ def urls_get():
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
         # передаем  SQL-запрос
         # чтобы выбрать всё из таблиц urls + url_checks
-        curs.execute("""SELECT urls.url_id, urls.name,
+        curs.execute("""WITH RankedUrlChecks AS
+        (SELECT uc.url_id, uc.status_code, uc.created_at,
+        ROW_NUMBER() OVER(PARTITION BY uc.url_id
+        ORDER BY uc.created_at DESC) AS rn
+        FROM url_checks uc)
+        SELECT urls.url_id, urls.name,
         uc.status_code, uc.created_at
         FROM urls
-        LEFT JOIN (
-            SELECT url_id, MAX(created_at)
-            AS max_created_at
-            FROM url_checks
-            GROUP BY url_id
-        ) AS max_dates ON urls.url_id = max_dates.url_id
-        LEFT JOIN url_checks uc
-        ON max_dates.url_id = uc.url_id
-        AND max_dates.max_created_at = uc.created_at
+        LEFT JOIN RankedUrlChecks uc
+        ON urls.url_id = uc.url_id AND uc.rn = 1
         ORDER BY urls.url_id DESC;""")
         # сохраняем результат в переменную
         all_urls = curs.fetchall()
