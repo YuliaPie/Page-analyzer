@@ -105,13 +105,13 @@ def add_url():
             RETURNING url_id;",
             (norm_url, current_date),
         )
-        url_id = curs.fetchone()[0]
+        id = curs.fetchone()[0]
     conn.commit()
     conn.close()
     # добавляем флеш-сообщение об успехе
     flash('Страница успешно добавлена', 'info')
     # делаем редирект на страницу нового url
-    return redirect(url_for('show_url', url_id=url_id))
+    return redirect(url_for('show_url', id=id))
 
 
 def validate_url(input_url):
@@ -131,12 +131,12 @@ def normalise_url(input_url):
     return f"{parsed_url.scheme}://{parsed_url.netloc}"
 
 
-@app.route('/urls/<int:url_id>')
-def show_url(url_id):
+@app.route('/urls/<int:id>')
+def show_url(id):
     try:
         conn = psycopg2.connect(DATABASE_URL)
         with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-            curs.execute("SELECT * FROM urls WHERE url_id = %s", (url_id,))
+            curs.execute("SELECT * FROM urls WHERE url_id = %s", (id,))
             url = curs.fetchone()
         conn.close()
         if url is None:
@@ -145,7 +145,7 @@ def show_url(url_id):
         # забираем новую запись о проверке с бд
         with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
             curs.execute("SELECT * FROM url_checks \
-            WHERE url_id=%s ORDER BY check_id DESC", (url_id,))
+            WHERE url_id=%s ORDER BY check_id DESC", (id,))
             url_checks = curs.fetchall()
         conn.close()
         messages = get_flashed_messages(with_categories=True)
@@ -156,12 +156,12 @@ def show_url(url_id):
         return render_template('error_500.html'), 500
 
 
-@app.post('/urls/<url_id>/checks')
-def make_check(url_id):
+@app.post('/urls/<id>/checks')
+def make_check(id):
     # получаем снова всю инфу про наш урл
     conn = psycopg2.connect(DATABASE_URL)
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        curs.execute(f'SELECT * FROM urls WHERE url_id={url_id}')
+        curs.execute(f'SELECT * FROM urls WHERE url_id={id}')
         url = curs.fetchone()
     conn.close()
     try:
@@ -185,12 +185,12 @@ def make_check(url_id):
                 "created_at)\
                 VALUES (%s, %s, %s, %s, %s, %s)\
                 RETURNING check_id;",
-                (url_id, url_response.status_code, h1, title,
+                (id, url_response.status_code, h1, title,
                  description, date.today().isoformat()),
             )
         conn.commit()
         conn.close()
-        return redirect(url_for('show_url', url_id=url_id))
+        return redirect(url_for('show_url', id=id))
     except RequestException:
         flash('Произошла ошибка при проверке', 'danger')
-        return redirect(url_for('show_url', url_id=url_id))
+        return redirect(url_for('show_url', id=id))
