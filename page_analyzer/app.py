@@ -58,7 +58,7 @@ def urls_get():
     # ловим флеш-сообщения
     messages = get_flashed_messages(with_categories=True)
     # рендерим шаблон списка сайтов, передав в него результат запроса
-    return render_template('urls.html', all_urls=all_urls, messages=messages,)
+    return render_template('urls.html', all_urls=all_urls, messages=messages, )
 
 
 # Обработчик добавления сайта в бд
@@ -150,8 +150,17 @@ def show_url(url_id):
         conn.close()
         if url is None:
             return render_template('error_404.html'), 404
+        conn = psycopg2.connect(DATABASE_URL)
+        # забираем новую запись о проверке с бд
+        with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
+            curs.execute("SELECT * FROM url_checks \
+            WHERE url_id=%s ORDER BY check_id DESC", (url_id,))
+            url_checks = curs.fetchall()
+        conn.close()
         messages = get_flashed_messages(with_categories=True)
-        return render_template('show_url.html', url=url, messages=messages)
+        return render_template(
+            'show_url.html',
+            url=url, url_checks=url_checks, messages=messages)
     except Exception:
         return render_template('error_500.html'), 500
 
@@ -176,7 +185,7 @@ def make_check(url_id):
         h1 = soup.h1.string if soup.h1 else ''
         title = soup.find('title').string if soup.find('title') else ''
         meta_description = soup.find("meta", property="og:description")
-        description = meta_description.get("content")\
+        description = meta_description.get("content") \
             if meta_description else ""
         with conn.cursor() as curs:
             curs.execute(
@@ -191,17 +200,7 @@ def make_check(url_id):
             )
         conn.commit()
         conn.close()
-        conn = psycopg2.connect(DATABASE_URL)
-        # забираем новую запись о проверке с бд
-        with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-            curs.execute("SELECT * FROM url_checks \
-            WHERE url_id=%s ORDER BY check_id DESC", (url_id,))
-            url_checks = curs.fetchall()
-        conn.close()
-        # рендерим шаблон отдельного url,
-        # но уже с заполненной таблицей проверок
-        return render_template('show_url.html',
-                               url=url, url_checks=url_checks, )
+        return redirect(url_for('show_url', url_id=url_id))
     except RequestException:
         flash('Произошла ошибка при проверке', 'danger')
-        return redirect(url_for('show_url', url_id=url_id, url=url))
+        return redirect(url_for('show_url', url_id=url_id))
