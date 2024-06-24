@@ -105,13 +105,13 @@ def add_url():
             RETURNING url_id;",
             (norm_url, current_date),
         )
-        new_id = curs.fetchone()[0]
+        url_id = curs.fetchone()[0]
     conn.commit()
     conn.close()
     # добавляем флеш-сообщение об успехе
     flash('Страница успешно добавлена', 'info')
     # делаем редирект на страницу нового url
-    return redirect(url_for('show_url', url_id=new_id))
+    return redirect(url_for('show_url', url_id=url_id))
 
 
 def validate_url(input_url):
