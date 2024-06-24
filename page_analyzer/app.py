@@ -171,12 +171,28 @@ def make_check(id):
         url_response.raise_for_status()
         # добавим запись о проверке в бд
         conn = psycopg2.connect(DATABASE_URL)
+        # Создаем объект BeautifulSoup
         soup = BeautifulSoup(url_response.text, 'html.parser')
+
+        # Извлекаем заголовок H1
         h1 = soup.h1.string if soup.h1 else ''
+
+        # Извлекаем заголовок страницы
         title = soup.find('title').string if soup.find('title') else ''
-        meta_description = soup.find("meta", property="og:description")
-        description = meta_description.get("content") \
-            if meta_description else ""
+
+        # Ищем описание по атрибуту "og:description"
+        og_description = soup.find("meta", property="og:description")
+
+        # Ищем все теги <meta> с атрибутом name="description"
+        meta_description = soup.find("meta", property="description")
+
+        # Определяем описание
+        if og_description:
+            description = og_description.get("content")
+        elif meta_description:
+            description = meta_description.get("content")
+        else:
+            description = ""
         with conn.cursor() as curs:
             curs.execute(
                 "INSERT INTO url_checks (url_id,"
