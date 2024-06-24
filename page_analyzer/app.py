@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 from flask import (Flask, render_template, request,
-                   flash, url_for, redirect, get_flashed_messages)
+                   flash, url_for, redirect, get_flashed_messages, abort)
 from dotenv import load_dotenv
 import os
 import psycopg2
@@ -140,17 +140,20 @@ def normalise_url(input_url):
     return f"{parsed_url.scheme}://{parsed_url.netloc}"
 
 
-@app.route('/urls/<url_id>')
+@app.route('/urls/<int:url_id>')
 def show_url(url_id):
-    # используем NamedTupleCursor, чтобы вернуть
-    # данные в виде именованного кортежа:
-    conn = psycopg2.connect(DATABASE_URL)
-    with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        curs.execute(f'SELECT * FROM urls WHERE url_id={url_id}')
-        url = curs.fetchone()
-    conn.close()
-    messages = get_flashed_messages(with_categories=True)
-    return render_template('show_url.html', url=url, messages=messages,)
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
+            curs.execute("SELECT * FROM urls WHERE url_id = %s", (url_id,))
+            url = curs.fetchone()
+        conn.close()
+        if url is None:
+            return render_template('error_404.html'), 404
+        messages = get_flashed_messages(with_categories=True)
+        return render_template('show_url.html', url=url, messages=messages)
+    except Exception:
+        return render_template('error_500.html'), 500
 
 
 # создание новой проверки
