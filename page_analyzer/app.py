@@ -18,10 +18,10 @@ from requests import RequestException
 # этот файл у нас добавлен в .gitignore
 # БД создана через оболочку psql, команда та же, что прописана в database.sql
 load_dotenv()
-# назначаем БД через обращение к переменной среды DATABASE_URL
-DATABASE_URL = os.getenv('DATABASE_URL')
 # создаем объект класса Flask, передав аргументом имя модуля
 app = Flask(__name__)
+# назначаем БД через обращение к переменной среды DATABASE_URL
+DATABASE_URL = os.getenv('DATABASE_URL')
 # извлекаем ключ из переменных окружения
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
