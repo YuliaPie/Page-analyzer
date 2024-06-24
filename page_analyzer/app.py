@@ -91,7 +91,7 @@ def add_url():
     if url:
         url_id = url[0]
         flash('Страница уже существует', 'info')
-        return redirect(url_for('urls_get', id=url_id))
+        return redirect(url_for('urls_get', url_id=url_id))
 
     # Если URL не существует, добавляем его в базу данных
     conn = psycopg2.connect(DATABASE_URL)
