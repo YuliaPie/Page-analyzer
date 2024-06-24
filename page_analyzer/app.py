@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 from flask import (Flask, render_template, request,
-                   flash, url_for, redirect, get_flashed_messages, abort)
+                   flash, url_for, redirect, get_flashed_messages)
 from dotenv import load_dotenv
 import os
 import psycopg2
