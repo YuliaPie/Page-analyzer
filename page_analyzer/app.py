@@ -108,19 +108,10 @@ def add_url():
         new_id = curs.fetchone()[0]
     conn.commit()
     conn.close()
-
-    # теперь выбираем из таблицы данные на новую запись
-    # используем NamedTupleCursor,
-    # чтобы вернуть данные в виде именованного кортежа:
-    conn = psycopg2.connect(DATABASE_URL)
-    with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        curs.execute(f'SELECT * FROM urls WHERE url_id={new_id}')
-        url = curs.fetchone()
-    conn.close()
     # добавляем флеш-сообщение об успехе
     flash('Страница успешно добавлена', 'info')
     # делаем редирект на страницу нового url
-    return redirect(url_for('show_url', url_id=new_id, url=url))
+    return redirect(url_for('show_url', url_id=new_id))
 
 
 def validate_url(input_url):
@@ -165,7 +156,6 @@ def show_url(url_id):
         return render_template('error_500.html'), 500
 
 
-# создание новой проверки
 @app.post('/urls/<url_id>/checks')
 def make_check(url_id):
     # получаем снова всю инфу про наш урл
