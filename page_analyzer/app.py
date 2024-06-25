@@ -3,151 +3,63 @@ from flask import (Flask, render_template, request,
                    flash, url_for, redirect, get_flashed_messages)
 from dotenv import load_dotenv
 import os
-import psycopg2
-from datetime import date
-import validators
-from psycopg2.extras import NamedTupleCursor
-from urllib.parse import urlparse
 import requests
 from requests import RequestException
+from page_analyzer.db_manager import (db_get_urls,
+                                      db_get_id_by_name,
+                                      db_add_url_get_id,
+                                      db_get_url_by_id,
+                                      db_get_checks_by_url_id,
+                                      db_add_check)
+from page_analyzer.tools import normalise_url, validate_url
 
-# загрузкa файлa .env
-# в нем: "export DATABASE_URL=postgresql://
-# postgres:ПАРОЛЬ@localhost:5432/postgres"
-# SECRET_KEY=<КЛЮЧ>
-# этот файл у нас добавлен в .gitignore
-# БД создана через оболочку psql, команда та же, что прописана в database.sql
 load_dotenv()
-# создаем объект класса Flask, передав аргументом имя модуля
 app = Flask(__name__)
-# назначаем БД через обращение к переменной среды DATABASE_URL
 DATABASE_URL = os.getenv('DATABASE_URL')
-# извлекаем ключ из переменных окружения
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+SECRET_KEY = app.config['SECRET_KEY']
 
 
-# Обработчик главной страницы
 @app.route('/')
 def show_main_page():
     return render_template('index.html')
 
 
-# Обработчик списка сайтов (отображение)
 @app.get('/urls')
 def urls_get():
-    # подключаемся к базе данных
-    conn = psycopg2.connect(DATABASE_URL)
-    # связываеемся с БД  через контекстный менеджер с cursor_factory
-    with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        # передаем  SQL-запрос
-        # чтобы выбрать всё из таблиц urls + url_checks
-        curs.execute("""WITH RankedUrlChecks AS
-        (SELECT uc.url_id, uc.status_code, uc.created_at,
-        ROW_NUMBER() OVER(PARTITION BY uc.url_id
-        ORDER BY uc.created_at DESC) AS rn
-        FROM url_checks uc)
-        SELECT urls.url_id, urls.name,
-        uc.status_code, uc.created_at
-        FROM urls
-        LEFT JOIN RankedUrlChecks uc
-        ON urls.url_id = uc.url_id AND uc.rn = 1
-        ORDER BY urls.url_id DESC;""")
-        # сохраняем результат в переменную
-        all_urls = curs.fetchall()
-    conn.close()  # закрываем соединение
-    # ловим флеш-сообщения
+    all_urls = db_get_urls(DATABASE_URL)
     messages = get_flashed_messages(with_categories=True)
-    # рендерим шаблон списка сайтов, передав в него результат запроса
     return render_template('urls.html', all_urls=all_urls, messages=messages, )
 
 
-# Обработчик добавления сайта в бд
 @app.post('/urls')
 def add_url():
-    # Получаем URL из формы
     get_url = request.form['url']
-    # Нормализуем введённый URL
     norm_url = normalise_url(get_url)
-    # Проверяем корректность URL
     error_msg = validate_url(norm_url)
     if error_msg:
-        # Если есть ошибка валидации, показываем сообщение
-        # об ошибке и возвращаем исходный URL обратно в форму
         flash(error_msg, 'danger')
-        # ловим флеш-сообщения
         messages = get_flashed_messages(with_categories=True)
         return render_template(
             'index.html',
-            # Возвращаем исходный URL обратно в форму
             url=get_url, messages=messages), 422
-
-    # Проверяем, существует ли URL в базе данных
-    # подключаемся к базе данных
-    conn = psycopg2.connect(DATABASE_URL)
-    with conn.cursor() as curs:
-        curs.execute('SELECT url_id FROM urls WHERE name=%s', (norm_url,))
-        url = curs.fetchone()
-    conn.close()  # закрываем соединение
+    url = db_get_id_by_name(DATABASE_URL, norm_url)
     if url:
         url_id = url[0]
         flash('Страница уже существует', 'info')
         return redirect(url_for('show_url', id=url_id))
-
-    # Если URL не существует, добавляем его в базу данных
-    conn = psycopg2.connect(DATABASE_URL)
-    with conn.cursor() as curs:
-        # добавляем в БД новый url с инфой из формы и текущей датой
-        # id у нас генерируется сам, возвращаем его и сохраняем в переменную
-        current_date = date.today().isoformat()
-        curs.execute(
-            "INSERT INTO urls (name, created_at)\
-            VALUES (%s, %s)\
-            RETURNING url_id;",
-            (norm_url, current_date),
-        )
-        id = curs.fetchone()[0]
-    conn.commit()
-    conn.close()
-    # добавляем флеш-сообщение об успехе
+    id = db_add_url_get_id(DATABASE_URL, norm_url)
     flash('Страница успешно добавлена', 'success')
-    # делаем редирект на страницу нового url
     return redirect(url_for('show_url', id=id))
-
-
-def validate_url(input_url):
-    if not input_url:
-        return 'URL обязателен для заполнения'
-    if not validators.url(input_url):
-        return 'Некорректный URL'
-    if len(input_url) > 255:
-        return 'Введенный URL превышает длину в 255 символов'
-
-
-# эти данные нормализуем
-def normalise_url(input_url):
-    # делим на протокол и хост
-    parsed_url = urlparse(input_url)
-    # соединяем обратно через ф-строку
-    return f"{parsed_url.scheme}://{parsed_url.netloc}"
 
 
 @app.route('/urls/<int:id>')
 def show_url(id):
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-            curs.execute("SELECT * FROM urls WHERE url_id = %s", (id,))
-            url = curs.fetchone()
-        conn.close()
+        url = db_get_url_by_id(DATABASE_URL, id)
         if url is None:
             return render_template('error_404.html'), 404
-        conn = psycopg2.connect(DATABASE_URL)
-        # забираем новую запись о проверке с бд
-        with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-            curs.execute("SELECT * FROM url_checks \
-            WHERE url_id=%s ORDER BY check_id DESC", (id,))
-            url_checks = curs.fetchall()
-        conn.close()
+        url_checks = db_get_checks_by_url_id(DATABASE_URL, id)
         messages = get_flashed_messages(with_categories=True)
         return render_template(
             'show_url.html',
@@ -158,48 +70,29 @@ def show_url(id):
 
 @app.post('/urls/<id>/checks')
 def make_check(id):
-    # получаем снова всю инфу про наш урл
-    conn = psycopg2.connect(DATABASE_URL)
-    with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        curs.execute(f'SELECT * FROM urls WHERE url_id={id}')
-        url = curs.fetchone()
-    conn.close()
+    url = db_get_url_by_id(DATABASE_URL, id)
     try:
-        # пробуем сделать запрос на сайт
-        url_response = requests.get(url.name)
-        # при ответе больше 400 вызовем ошибку
-        url_response.raise_for_status()
-        # добавим запись о проверке в бд
-        conn = psycopg2.connect(DATABASE_URL)
-        # Создаем объект BeautifulSoup
-        soup = BeautifulSoup(url_response.text, 'html.parser')
-
-        # Извлекаем заголовок H1
-        h1 = soup.h1.string if soup.h1 else ''
-
-        # Извлекаем заголовок страницы
-        title = soup.find('title').string if soup.find('title') else ''
-        all_meta_tags = soup.find_all("meta")
-        description = ""
-        for meta_tag in all_meta_tags:
-            if meta_tag.get("name") == "description":
-                description = meta_tag.get('content')
-                break
-        with conn.cursor() as curs:
-            curs.execute(
-                "INSERT INTO url_checks (url_id,"
-                "status_code, h1, "
-                "title, description,"
-                "created_at)\
-                VALUES (%s, %s, %s, %s, %s, %s)\
-                RETURNING check_id;",
-                (id, url_response.status_code, h1, title,
-                 description, date.today().isoformat()),
-            )
-        conn.commit()
-        conn.close()
+        status_code, h1, title, description = parse_url(url.name)
+        db_add_check(DATABASE_URL, id, status_code, h1, title,
+                     description)
         flash('Страница успешно проверена', 'success')
         return redirect(url_for('show_url', id=id))
     except RequestException:
         flash('Произошла ошибка при проверке', 'danger')
         return redirect(url_for('show_url', id=id))
+
+
+def parse_url(url_name):
+    url_response = requests.get(url_name)
+    url_response.raise_for_status()
+    soup = BeautifulSoup(url_response.text, 'html.parser')
+    status_code = url_response.status_code
+    h1 = soup.h1.string if soup.h1 else ''
+    title = soup.find('title').string if soup.find('title') else ''
+    all_meta_tags = soup.find_all("meta")
+    description = ""
+    for meta_tag in all_meta_tags:
+        if meta_tag.get("name") == "description":
+            description = meta_tag.get('content')
+            break
+    return status_code, h1, title, description
