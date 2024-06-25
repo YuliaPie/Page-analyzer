@@ -179,20 +179,12 @@ def make_check(id):
 
         # Извлекаем заголовок страницы
         title = soup.find('title').string if soup.find('title') else ''
-
-        # Ищем описание по атрибуту "og:description"
-        og_description = soup.find("meta", property="og:description")
-
-        # Ищем все теги <meta> с атрибутом name="description"
-        meta_description = soup.find("meta", property="description")
-
-        # Определяем описание
-        if og_description:
-            description = og_description.get("content")
-        elif meta_description:
-            description = meta_description.get("content")
-        else:
-            description = ""
+        all_meta_tags = soup.find_all("meta")
+        description = ""
+        for meta_tag in all_meta_tags:
+            if meta_tag.get("name") == "description":
+                description = meta_tag.get('content')
+                break
         with conn.cursor() as curs:
             curs.execute(
                 "INSERT INTO url_checks (url_id,"
