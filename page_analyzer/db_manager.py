@@ -21,7 +21,7 @@ def get_urls(conn):
 
 def get_id_by_name(conn, name):
     with conn.cursor(cursor_factory=NamedTupleCursor) as curs:
-        curs.execute(f'SELECT url_id FROM urls WHERE name={name}')
+        curs.execute(f'SELECT url_id FROM urls WHERE name={f"'{name}'"}')
         url_id = curs.fetchone()
     return url_id
 

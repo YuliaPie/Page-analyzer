@@ -17,7 +17,6 @@ app = Flask(__name__)
 DATABASE_URL = os.getenv('DATABASE_URL')
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 SECRET_KEY = app.config['SECRET_KEY']
-conn = psycopg2.connect(DATABASE_URL)
 
 
 @app.route('/')
@@ -27,7 +26,9 @@ def show_main_page():
 
 @app.get('/urls')
 def urls_get():
+    conn = psycopg2.connect(DATABASE_URL)
     all_urls = get_urls(conn)
+    conn.close()
     messages = get_flashed_messages(with_categories=True)
     return render_template('urls.html', all_urls=all_urls, messages=messages, )
 
@@ -43,12 +44,16 @@ def add_url():
         return render_template(
             'index.html',
             url=get_url, messages=messages), 422
+    conn = psycopg2.connect(DATABASE_URL)
     url = get_id_by_name(conn, norm_url)
+    conn.close()
     if url:
         url_id = url[0]
         flash('Страница уже существует', 'info')
         return redirect(url_for('show_url', id=url_id))
+    conn = psycopg2.connect(DATABASE_URL)
     id = insert_url_get_id(conn, norm_url)
+    conn.close()
     flash('Страница успешно добавлена', 'success')
     return redirect(url_for('show_url', id=id))
 
@@ -56,10 +61,14 @@ def add_url():
 @app.route('/urls/<int:id>')
 def show_url(id):
     try:
+        conn = psycopg2.connect(DATABASE_URL)
         url = get_url_by_id(conn, id)
+        conn.close()
         if url is None:
             return render_template('error_404.html'), 404
+        conn = psycopg2.connect(DATABASE_URL)
         url_checks = get_checks_by_url_id(conn, id)
+        conn.close()
         messages = get_flashed_messages(with_categories=True)
         return render_template(
             'show_url.html',
@@ -70,11 +79,15 @@ def show_url(id):
 
 @app.post('/urls/<id>/checks')
 def make_check(id):
+    conn = psycopg2.connect(DATABASE_URL)
     url = get_url_by_id(conn, id)
+    conn.close()
     try:
         status_code, h1, title, description = parse_url(url.name)
+        conn = psycopg2.connect(DATABASE_URL)
         insert_check(conn, id, status_code, h1, title,
                      description)
+        conn.close()
         flash('Страница успешно проверена', 'success')
         return redirect(url_for('show_url', id=id))
     except RequestException:
