@@ -10,7 +10,11 @@
 ### Link to the domain where the app is deployed:
 https://python-project-83-1-181b.onrender.com
 
-About
+### О проекте
+
+Эта веб-приложение предназначено для оценки SEO-дружелюбности веб-сайтов онлайн. Оно предоставляет пользователям простой, но мощный инструмент для оценки готовности любого сайта к SEO. При вводе URL сайта приложение выполняет серию проверок для подтверждения корректности входных данных, после чего отправляет HTTP-запрос на введенный сайт.
+
+### About
 
 This web application is designed to assess the SEO-friendliness of websites online. It provides users with a simple yet powerful tool to evaluate the SEO readiness of any website they're interested in. By entering the URL of the site, the application performs a series of checks to ensure the input is valid and then proceeds to make an HTTP request to the entered website.
 
